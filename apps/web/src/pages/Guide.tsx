@@ -30,8 +30,10 @@ export default function Guide() {
   const aiClientRef = useRef<OpenAIRealtimeClient | null>(null);
   const visionResultRef = useRef(currentVisionResult);
 
-  // WebSocket URL derived from current page origin (Vite proxy handles routing to API)
+  // WebSocket URL - use env var if set, otherwise derive from current origin
   const wsUrl = useMemo(() => {
+    const envUrl = import.meta.env.VITE_WS_SERVER_URL as string | undefined;
+    if (envUrl) return envUrl;
     const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
     return `${proto}//${window.location.host}/ws`;
   }, []);
