@@ -1,51 +1,38 @@
 # VOX
 
-写真撮影を起点に音声ガイドが始まる体験を目指すプロトタイプです。現時点の実装は、Agora（RTC）を使った低遅延の音声通話（複数端末参加）と、トークン発行用のローカルAPIです。
+AI音声ガイド & 日本語翻訳アシスタント
 
-## Apps
+## Features
 
-- `apps/web`: Vite + React（UI）
-- `apps/api`: Express（Agora RTC token server）
+- **Guide Mode**: 写真を撮ると英語/日本語で説明
+- **Japanese Mode**: 英語→日本語翻訳を2回繰り返す
+- **Voice Chat**: OpenAI Realtime APIでリアルタイム会話
+- **Memories**: 写真の保存・閲覧
+
+## Tech Stack
+
+- React + TypeScript + Vite
+- OpenAI Realtime API (GPT-4o)
+- Tailwind CSS
+- Vercel
 
 ## Setup
 
-### 1) Token server（Agora）
-
-```bash
-cd apps/api
-cp .env.example .env
-```
-
-`.env` に以下を設定します。
-
-- `AGORA_APP_ID`
-- `AGORA_APP_CERTIFICATE`
-
-起動:
-
-```bash
-npm install
-npm run dev
-```
-
-### 2) Web app
-
 ```bash
 cd apps/web
+npm install
 cp .env.example .env.local
 ```
 
-`.env.local` に以下を設定します。
-
-- `VITE_AGORA_APP_ID`（`apps/api` の `AGORA_APP_ID` と一致させる）
-- `VITE_AGORA_TOKEN_SERVER_URL`（既定: `http://localhost:4000`）
-
-起動:
+`.env.local`:
+```
+OPENAI_API_KEY=your_key
+```
 
 ```bash
-npm install
 npm run dev
 ```
 
-同じ `Channel` 名で複数端末から `Join (Voice)` すると相互に音声が聞こえます。
+## Deploy
 
+Vercelにデプロイ済み。環境変数 `OPENAI_API_KEY` を設定。
