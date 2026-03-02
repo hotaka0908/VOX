@@ -63,7 +63,7 @@ export default function Camera() {
 
       {/* Permission error */}
       {error && (
-        <div className="absolute inset-x-0 top-16 z-10 bg-vox-danger/90 px-4 py-3 text-center text-sm text-white">
+        <div className="absolute left-1/2 -translate-x-1/2 top-16 z-10 rounded-md bg-vox-danger/90 px-6 py-3 text-center text-sm text-white whitespace-nowrap">
           {error}
           <button onClick={startCamera} className="ml-2 underline">
             再試行
