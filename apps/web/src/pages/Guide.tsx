@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { OpenAIRealtimeClient } from "@/lib/openai-realtime";
 import { analyzePhoto } from "@/lib/vision";
@@ -25,59 +25,52 @@ export default function Guide() {
   const saveMemory = useAppStore((s) => s.saveMemory);
   const currentVisionResult = useAppStore((s) => s.currentVisionResult);
 
-  const [status, setStatus] = useState<"analyzing" | "connecting" | "ready" | "error">("analyzing");
+  const [status, setStatus] = useState<"analyzing" | "connecting" | "ready" | "error">(
+    currentPhoto ? "analyzing" : "connecting"
+  );
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const aiClientRef = useRef<OpenAIRealtimeClient | null>(null);
   const visionResultRef = useRef(currentVisionResult);
+  const initialModeRef = useRef(mode);
 
-  // WebSocket URL - use env var if set, otherwise derive from current origin
-  const wsUrl = useMemo(() => {
-    const envUrl = import.meta.env.VITE_WS_SERVER_URL as string | undefined;
-    if (envUrl) return envUrl;
-    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-    return `${proto}//${window.location.host}/ws`;
-  }, []);
-
-  // Start guide session on mount
   useEffect(() => {
-    if (!currentPhoto) {
-      navigate("/");
-      return;
-    }
-
     let cancelled = false;
 
     const startSession = async () => {
       try {
-        // Step 1: Analyze photo with Vision API
-        setStatus("analyzing");
         let visionCtx: string | undefined;
-        try {
-          const result = await analyzePhoto(currentPhoto.dataUrl);
-          if (!cancelled) {
-            setCurrentVisionResult(result);
-            visionResultRef.current = result;
-            visionCtx = formatVisionContext(result);
+
+        // Step 1: Analyze photo if present
+        if (currentPhoto) {
+          setStatus("analyzing");
+          try {
+            const result = await analyzePhoto(currentPhoto.dataUrl);
+            if (!cancelled) {
+              setCurrentVisionResult(result);
+              visionResultRef.current = result;
+              visionCtx = formatVisionContext(result);
+            }
+          } catch (e) {
+            console.warn("Vision analysis failed:", e);
           }
-        } catch (e) {
-          console.warn("Vision analysis failed, starting without photo context:", e);
         }
 
         if (cancelled) return;
 
-        // Step 2: Connect to OpenAI Realtime
+        // Step 2: Connect to OpenAI Realtime with current mode
         setStatus("connecting");
-        const instruction = buildGuideInstruction(visionCtx);
-        const client = new OpenAIRealtimeClient(wsUrl, instruction);
+        const instruction = initialModeRef.current === "japanese-assist"
+          ? buildJapaneseAssistInstruction()
+          : buildGuideInstruction(visionCtx);
 
-        // Wire up callbacks
+        const client = new OpenAIRealtimeClient("", instruction);
+
         client.onSpeechStateChange = (state) => {
           if (!cancelled) setAiSpeechState(state);
         };
 
         client.onTranscript = (text, role) => {
           if (cancelled) return;
-          // Detect voice command for Japanese assist mode
           if (role === "user" && text.includes("日本語アシストモード")) {
             setMode("japanese-assist");
             client.updateSession(buildJapaneseAssistInstruction());
@@ -96,15 +89,15 @@ export default function Guide() {
         setAiConnected(true);
         setStatus("ready");
 
-        // Step 3: Prompt AI to describe the photo
-        if (visionCtx) {
+        // Step 3: If photo and guide mode, prompt AI
+        if (visionCtx && initialModeRef.current === "guide") {
           client.sendTextMessage(
-            "I just took a photo of something interesting. Please describe what you see and tell me about it.",
+            "I just took a photo. Please briefly describe what you see.",
           );
         }
       } catch (e) {
         if (!cancelled) {
-          console.error("Guide session failed:", e);
+          console.error("Session failed:", e);
           setStatus("error");
           setErrorMsg(String(e));
         }
@@ -142,7 +135,6 @@ export default function Guide() {
   };
 
   const onEndConversation = () => {
-    // Save memory before leaving
     if (currentPhoto) {
       saveMemory(currentPhoto, visionResultRef.current ?? undefined);
     }
@@ -153,7 +145,6 @@ export default function Guide() {
     }
     setAiConnected(false);
     setAiSpeechState("idle");
-    setMode("guide");
     navigate("/");
   };
 
@@ -166,7 +157,7 @@ export default function Guide() {
           className="flex items-center gap-1 text-sm text-white/70 active:text-white"
         >
           <ArrowLeft size={18} />
-          Back
+          戻る
         </button>
         <ModeToggle mode={mode} onToggle={onToggleMode} />
       </header>
@@ -181,7 +172,7 @@ export default function Guide() {
           />
           <div className="flex-1 min-w-0">
             {status === "analyzing" ? (
-              <p className="text-xs text-white/50">Analyzing photo...</p>
+              <p className="text-xs text-white/50">写真を分析中...</p>
             ) : currentVisionResult ? (
               <>
                 <p className="truncate text-sm font-medium text-white/90">
@@ -192,7 +183,7 @@ export default function Guide() {
                 </p>
               </>
             ) : (
-              <p className="text-xs text-white/50">Ready to talk</p>
+              <p className="text-xs text-white/50">準備完了</p>
             )}
           </div>
         </div>
@@ -203,14 +194,14 @@ export default function Guide() {
         {status === "analyzing" && (
           <div className="flex flex-col items-center gap-3">
             <div className="h-10 w-10 animate-spin rounded-full border-2 border-vox-primary border-t-transparent" />
-            <p className="text-sm text-white/60">Analyzing your photo...</p>
+            <p className="text-sm text-white/60">写真を分析中...</p>
           </div>
         )}
 
         {status === "connecting" && (
           <div className="flex flex-col items-center gap-3">
             <div className="h-10 w-10 animate-spin rounded-full border-2 border-vox-primary border-t-transparent" />
-            <p className="text-sm text-white/60">Connecting to guide...</p>
+            <p className="text-sm text-white/60">接続中...</p>
           </div>
         )}
 
@@ -220,7 +211,7 @@ export default function Guide() {
 
         {status === "error" && (
           <div className="mx-6 rounded-xl bg-vox-danger/20 p-4 text-center">
-            <p className="text-sm text-vox-danger">Connection failed</p>
+            <p className="text-sm text-vox-danger">接続に失敗しました</p>
             {errorMsg && <p className="mt-1 text-xs text-white/40">{errorMsg}</p>}
           </div>
         )}
@@ -229,19 +220,27 @@ export default function Guide() {
         {status === "ready" && mode === "japanese-assist" && (
           <div className="rounded-full bg-vox-accent/10 px-4 py-2">
             <p className="text-xs text-vox-accent">
-              Speak English — I'll translate to Japanese
+              英語で話してください → 日本語に翻訳します
+            </p>
+          </div>
+        )}
+
+        {status === "ready" && mode === "guide" && (
+          <div className="rounded-full bg-vox-primary/10 px-4 py-2">
+            <p className="text-xs text-vox-primary">
+              何でも聞いてください
             </p>
           </div>
         )}
       </div>
 
       {/* End conversation button */}
-      <div className="px-6 pb-8">
+      <div className="px-6 pb-8 pb-safe-bottom">
         <button
           onClick={onEndConversation}
           className="w-full rounded-xl border border-white/10 py-3 text-sm font-medium text-white/60 transition-all active:scale-[0.98] active:bg-white/5"
         >
-          End Conversation
+          会話を終了
         </button>
       </div>
     </div>

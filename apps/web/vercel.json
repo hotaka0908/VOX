@@ -3,7 +3,11 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
-    { "source": "/api/vision", "destination": "/api/vision" },
-    { "source": "/api/rtc-token", "destination": "/api/rtc-token" }
-  ]
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ],
+  "functions": {
+    "api/vision.ts": {
+      "maxDuration": 30
+    }
+  }
 }

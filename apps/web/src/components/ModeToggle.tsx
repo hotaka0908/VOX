@@ -25,7 +25,7 @@ export default function ModeToggle({ mode, onToggle }: Props) {
           isAssist ? "bg-vox-accent" : "bg-white/40",
         )}
       />
-      {isAssist ? "JP Assist" : "Guide"}
+      {isAssist ? "japanese" : "guide"}
     </button>
   );
 }
